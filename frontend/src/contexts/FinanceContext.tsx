@@ -59,6 +59,8 @@ interface FinanceContextType {
     transactions: Transaction[]; 
     budgets: Budget[]; 
     recurringTransactions: RecurringTransaction[];
+    investmentHoldings?: InvestmentHolding[];
+    investmentTransactions?: InvestmentTransaction[];
     categories?: CustomCategory[];
     settings?: AppSettings;
   }) => void;
@@ -835,6 +837,8 @@ export const FinanceProvider: React.FC<FinanceProviderProps> = ({ children }) =>
     transactions: Transaction[]; 
     budgets: Budget[]; 
     recurringTransactions: RecurringTransaction[];
+    investmentHoldings?: InvestmentHolding[];
+    investmentTransactions?: InvestmentTransaction[];
     categories?: CustomCategory[];
     settings?: AppSettings;
   }) => {
