@@ -15,7 +15,8 @@ import { QIFImport } from './QIFImport';
 import { CSVImport } from './CSVImport';
 
 export const Settings = () => {
-  const { accounts, transactions, budgets, recurringTransactions, settings, importData, loadSampleData, clearAllData, updateSettings } = useFinance();
+ const { accounts, transactions, budgets, recurringTransactions, settings, importData, loadSampleData, clearAllData, updateSettings, investmentHoldings, investmentTransactions } = useFinance();
+
   const { toast } = useToast();
   const [isImporting, setIsImporting] = useState(false);
 
