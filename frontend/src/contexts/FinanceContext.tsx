@@ -846,6 +846,8 @@ export const FinanceProvider: React.FC<FinanceProviderProps> = ({ children }) =>
     setTransactions(data.transactions || []);
     setBudgets(data.budgets || []);
     setRecurringTransactions(data.recurringTransactions || []);
+    if (data.investmentHoldings) setInvestmentHoldings(data.investmentHoldings);
+    if (data.investmentTransactions) setInvestmentTransactions(data.investmentTransactions);
     
     // Import custom categories if provided
     if (data.categories && data.categories.length > 0) {
