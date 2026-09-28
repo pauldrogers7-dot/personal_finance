@@ -28,16 +28,19 @@ export const Settings = () => {
   };
 
   const handleExport = () => {
-    const data = {
-      accounts,
-      transactions,
-      budgets,
-      recurringTransactions,
-      categories: settings.customCategories,
-      settings,
-      exportDate: new Date().toISOString(),
-      version: '1.0',
-    };
+ const data = {
+  accounts,
+  transactions,
+  budgets,
+  recurringTransactions,
+  investmentHoldings,
+  investmentTransactions,
+  categories: settings.customCategories,
+  settings,
+  exportDate: new Date().toISOString(),
+  version: '1.0',
+};
+
 
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -71,13 +74,16 @@ export const Settings = () => {
         }
 
         importData({
-          accounts: data.accounts || [],
-          transactions: data.transactions || [],
-          budgets: data.budgets || [],
-          recurringTransactions: data.recurringTransactions || [],
-          categories: data.categories || [],
-          settings: data.settings || settings,
-        });
+  accounts: data.accounts || [],
+  transactions: data.transactions || [],
+  budgets: data.budgets || [],
+  recurringTransactions: data.recurringTransactions || [],
+  investmentHoldings: data.investmentHoldings || [],
+  investmentTransactions: data.investmentTransactions || [],
+  categories: data.categories || [],
+  settings: data.settings || settings,
+});
+
 
         toast({
           title: 'Data Imported',
