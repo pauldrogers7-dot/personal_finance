@@ -28,19 +28,25 @@ export const Settings = () => {
     });
   };
 
-  const handleExport = () => {
- const data = {
-  accounts,
-  transactions,
-  budgets,
-  recurringTransactions,
-  investmentHoldings,
-  investmentTransactions,
-  categories: settings.customCategories,
-  settings,
-  exportDate: new Date().toISOString(),
-  version: '1.0',
-};
+ const handleExport = () => {
+  // Read investment data directly from localStorage as a guaranteed fallback
+  // in case the context state hasn't fully hydrated
+  const holdingsFromStorage = JSON.parse(localStorage.getItem('finance-investment-holdings') || '[]');
+  const investmentTxFromStorage = JSON.parse(localStorage.getItem('finance-investment-transactions') || '[]');
+
+  const data = {
+    accounts,
+    transactions,
+    budgets,
+    recurringTransactions,
+    investmentHoldings: investmentHoldings.length > 0 ? investmentHoldings : holdingsFromStorage,
+    investmentTransactions: investmentTransactions.length > 0 ? investmentTransactions : investmentTxFromStorage,
+    categories: settings.customCategories,
+    settings,
+    exportDate: new Date().toISOString(),
+    version: '1.0',
+  };
+
 
 
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
