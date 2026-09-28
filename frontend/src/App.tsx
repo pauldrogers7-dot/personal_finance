@@ -51,7 +51,7 @@ function AppContent() {
 }
 
 function MainApp() {
-  const { accounts, transactions, budgets, recurringTransactions, settings } = useFinance();
+ const { accounts, transactions, budgets, recurringTransactions, settings, investmentHoldings, investmentTransactions } = useFinance();
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
