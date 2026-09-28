@@ -55,17 +55,22 @@ function MainApp() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleQuickBackup = () => {
+    const handleQuickBackup = () => {
+    const holdingsFromStorage = JSON.parse(localStorage.getItem('finance-investment-holdings') || '[]');
+    const investmentTxFromStorage = JSON.parse(localStorage.getItem('finance-investment-transactions') || '[]');
     const data = {
       accounts,
       transactions,
       budgets,
       recurringTransactions,
+      investmentHoldings: investmentHoldings.length > 0 ? investmentHoldings : holdingsFromStorage,
+      investmentTransactions: investmentTransactions.length > 0 ? investmentTransactions : investmentTxFromStorage,
       categories: settings.customCategories,
       settings,
       exportDate: new Date().toISOString(),
       version: '1.0',
     };
+
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
