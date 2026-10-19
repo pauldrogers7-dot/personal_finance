@@ -33,7 +33,7 @@ export const CashFlowForecast = () => {
     ? accounts.find(acc => acc.id === selectedAccountIds[0]) ?? null
     : null;
 
-  const getNextOccurrence = (date: Date, frequency: RecurringFrequency): Date => {
+   const getNextOccurrence = (date: Date, frequency: RecurringFrequency): Date => {
     const next = new Date(date);
     switch (frequency) {
       case 'daily': next.setDate(next.getDate() + 1); break;
@@ -45,6 +45,66 @@ export const CashFlowForecast = () => {
     }
     return next;
   };
+
+  const getInterestIntervalMonths = (frequency?: string): number | null => {
+    switch (frequency) {
+      case 'monthly': return 1;
+      case 'quarterly': return 3;
+      case 'annually': return 12;
+      default: return null; // 'other' or unset - timing unknown, can't estimate
+    }
+  };
+
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+  // Simulates the account's own balance over time (applying any deposits/withdrawals
+  // from accountEvents) and accrues interest using the real number of days in each
+  // period, so the estimate fluctuates with month length and grows as the balance grows.
+  const generateInterestOccurrences = (
+    account: { id: string; balance: number; interestRate?: number; interestFrequency?: string; interestPayoutAccountId?: string },
+    accountEvents: { date: Date; amount: number }[],
+    startDate: Date,
+    endDate: Date
+  ) => {
+    const occurrences: { date: Date; amount: number }[] = [];
+    const intervalMonths = getInterestIntervalMonths(account.interestFrequency);
+    if (!account.interestRate || !intervalMonths) return occurrences;
+
+    const events = [...accountEvents].sort((a, b) => a.date.getTime() - b.date.getTime());
+    let eventIndex = 0;
+    let runningBalance = account.balance;
+    let periodStart = new Date(startDate);
+    const annualRate = account.interestRate / 100;
+    const payoutIsSameAccount = (account.interestPayoutAccountId || account.id) === account.id;
+
+    let nextInterestDate = new Date(startDate);
+    nextInterestDate.setMonth(nextInterestDate.getMonth() + intervalMonths);
+
+    while (nextInterestDate <= endDate) {
+      // Apply any deposits/withdrawals that happen before this interest date
+      while (eventIndex < events.length && events[eventIndex].date <= nextInterestDate) {
+        runningBalance += events[eventIndex].amount;
+        eventIndex++;
+      }
+
+      const daysInPeriod = Math.round((nextInterestDate.getTime() - periodStart.getTime()) / MS_PER_DAY);
+      const dailyRate = annualRate / 365;
+      const amount = runningBalance * dailyRate * daysInPeriod;
+
+      if (amount) {
+        occurrences.push({ date: new Date(nextInterestDate), amount });
+        // Compound if interest is paid back into this same account
+        if (payoutIsSameAccount) runningBalance += amount;
+      }
+
+      periodStart = new Date(nextInterestDate);
+      nextInterestDate = new Date(nextInterestDate);
+      nextInterestDate.setMonth(nextInterestDate.getMonth() + intervalMonths);
+    }
+
+    return occurrences;
+  };
+
 
   const generateOccurrences = (recurring: RecurringTransaction, endDate: Date) => {
     const occurrences: { date: Date; amount: number; type: string }[] = [];
@@ -80,6 +140,15 @@ export const CashFlowForecast = () => {
     );
 
     const allOccurrences: { date: Date; amount: number; type: string; description: string }[] = [];
+    
+    // Per-account timeline of balance-affecting events (deposits/withdrawals), used to
+    // simulate each interest-earning account's own balance accurately over time.
+    const accountEventsMap = new Map<string, { date: Date; amount: number }[]>();
+    const addAccountEvent = (accountId: string, date: Date, amount: number) => {
+      if (!accountEventsMap.has(accountId)) accountEventsMap.set(accountId, []);
+      accountEventsMap.get(accountId)!.push({ date, amount });
+    };
+
     activeRecurring.forEach(recurring => {
       const description = recurring.payee || recurring.description || 'Recurring transaction';
 
@@ -89,6 +158,12 @@ export const CashFlowForecast = () => {
           // Source account - deduct amount
           if (acc.id === recurring.accountId) {
             const occurrences = generateOccurrences(recurring, endDate);
+                    occurrences.forEach(occ => {
+          addAccountEvent(recurring.accountId, occ.date, -recurring.amount);
+          if (recurring.toAccountId) addAccountEvent(recurring.toAccountId, occ.date, recurring.amount);
+        });
+
+
             occurrences.forEach(occ => {
               allOccurrences.push({
                 date: occ.date,
@@ -114,6 +189,7 @@ export const CashFlowForecast = () => {
       } else {
         const occurrences = generateOccurrences(recurring, endDate);
         occurrences.forEach(occ => {
+          addAccountEvent(recurring.accountId, occ.date, occ.amount);
           allOccurrences.push({
             ...occ,
             description
