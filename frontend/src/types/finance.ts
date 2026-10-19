@@ -70,6 +70,10 @@ export interface Account {
   warningThresholdHigh?: number; // Used by AccountWarnings component
   includeInTotalBalance?: boolean; // Whether to include in the overall total balance (default: true)
   includeInTypeTotal?: boolean;    // Whether to include in the account-type subtotals (default: true)
+  interestRate?: number; // Annual interest rate (%), typically for savings accounts
+  interestFrequency?: 'monthly' | 'quarterly' | 'annually' | 'other'; // How often interest is paid
+  interestPayoutAccountId?: string; // Account interest is paid into (defaults to this account if unset)
+
 }
 
 export interface TransactionSplit {
