@@ -36,6 +36,9 @@ export const Accounts = () => {
     warningThresholdHigh: '',
     includeInTotalBalance: true,
     includeInTypeTotal: true,
+        interestRate: '',
+    interestFrequency: 'monthly',
+    interestPayoutAccountId: '',
     // Property fields
     propertyAddress: '',
     purchasePrice: '',
@@ -69,6 +72,9 @@ export const Accounts = () => {
       warningThresholdHigh: '',
       includeInTotalBalance: true,
       includeInTypeTotal: true,
+      interestRate: '',
+      interestFrequency: 'monthly',
+      interestPayoutAccountId: '',
       propertyAddress: '',
       purchasePrice: '',
       purchaseDate: '',
@@ -99,6 +105,11 @@ export const Accounts = () => {
       highBalanceWarning: formData.warningThresholdHigh ? parseFloat(formData.warningThresholdHigh) : undefined,
       includeInTotalBalance: formData.includeInTotalBalance,
       includeInTypeTotal: formData.includeInTypeTotal,
+            ...(formData.type === 'savings' && {
+        interestRate: formData.interestRate ? parseFloat(formData.interestRate) : undefined,
+        interestFrequency: formData.interestRate ? formData.interestFrequency : undefined,
+        interestPayoutAccountId: formData.interestRate ? (formData.interestPayoutAccountId || undefined) : undefined,
+      }),
       ...(formData.type === 'property' && {
         propertyAddress: formData.propertyAddress,
         purchasePrice: parseFloat(formData.purchasePrice) || 0,
@@ -135,6 +146,9 @@ export const Accounts = () => {
         warningThresholdHigh: (account.warningThresholdHigh ?? account.highBalanceWarning)?.toString() || '',
         includeInTotalBalance: account.includeInTotalBalance !== false,
         includeInTypeTotal: account.includeInTypeTotal !== false,
+                interestRate: (account as any).interestRate?.toString() || '',
+        interestFrequency: (account as any).interestFrequency || 'monthly',
+        interestPayoutAccountId: (account as any).interestPayoutAccountId || '',
         propertyAddress: (account as any).propertyAddress || '',
         purchasePrice: (account as any).purchasePrice?.toString() || '',
         purchaseDate: (account as any).purchaseDate || '',
@@ -326,6 +340,52 @@ export const Accounts = () => {
               </div>
 
               {/* Property-specific fields */}
+                            {/* Interest details - savings accounts */}
+              {formData.type === 'savings' && (
+                <div className="space-y-4 border-t pt-4">
+                  <h3 className="font-semibold text-sm">💰 Interest Details</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label>Interest Rate (% per year)</Label>
+                      <Input type="number" step="0.01" placeholder="e.g., 4.5" value={formData.interestRate} onChange={(e) => setFormData({ ...formData, interestRate: e.target.value })} />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Interest Paid</Label>
+                      <Select value={formData.interestFrequency} onValueChange={(v: any) => setFormData({ ...formData, interestFrequency: v })}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                          <SelectItem value="quarterly">Quarterly</SelectItem>
+                          <SelectItem value="annually">Annually</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Interest Paid Into</Label>
+                    <Select
+                      value={formData.interestPayoutAccountId || 'same'}
+                      onValueChange={(v) => setFormData({ ...formData, interestPayoutAccountId: v === 'same' ? '' : v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="same">This account</SelectItem>
+                        {accounts.filter(a => a.id !== editingAccount).map(a => (
+                          <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Estimated interest based on this rate will be included in your Cash Flow Forecast
+                    </p>
+                  </div>
+                </div>
+              )}
               {formData.type === 'property' && (
                 <div className="space-y-4 border-t pt-4">
                   <h3 className="font-semibold text-sm">🏠 Property Details</h3>
@@ -467,7 +527,11 @@ export const Accounts = () => {
                       </div>
                       <div className="min-w-0 flex-1 overflow-hidden">
                         <CardTitle className="text-lg truncate">{account.name}</CardTitle>
-                        <CardDescription className="capitalize truncate">{ACCOUNT_TYPE_LABELS[account.type]}</CardDescription>
+                                              <CardDescription className="capitalize truncate">
+                          {ACCOUNT_TYPE_LABELS[account.type]}
+                          {account.type === 'savings' && account.interestRate ? ` • ${account.interestRate}% ${account.interestFrequency}` : ''}
+                        </CardDescription>
+
                       </div>
                     </div>
                     <div className="flex gap-1 shrink-0">
