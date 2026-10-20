@@ -33,7 +33,7 @@ export const CashFlowForecast = () => {
     ? accounts.find(acc => acc.id === selectedAccountIds[0]) ?? null
     : null;
 
-   const getNextOccurrence = (date: Date, frequency: RecurringFrequency): Date => {
+  const getNextOccurrence = (date: Date, frequency: RecurringFrequency): Date => {
     const next = new Date(date);
     switch (frequency) {
       case 'daily': next.setDate(next.getDate() + 1); break;
@@ -105,7 +105,6 @@ export const CashFlowForecast = () => {
     return occurrences;
   };
 
-
   const generateOccurrences = (recurring: RecurringTransaction, endDate: Date) => {
     const occurrences: { date: Date; amount: number; type: string }[] = [];
     let currentDate = new Date(recurring.nextDate);
@@ -140,7 +139,7 @@ export const CashFlowForecast = () => {
     );
 
     const allOccurrences: { date: Date; amount: number; type: string; description: string }[] = [];
-    
+
     // Per-account timeline of balance-affecting events (deposits/withdrawals), used to
     // simulate each interest-earning account's own balance accurately over time.
     const accountEventsMap = new Map<string, { date: Date; amount: number }[]>();
@@ -153,17 +152,16 @@ export const CashFlowForecast = () => {
       const description = recurring.payee || recurring.description || 'Recurring transaction';
 
       if (recurring.type === 'transfer') {
-        // For each selected account, generate the correct side of the transfer
-        selectedAccounts.forEach(acc => {
-          // Source account - deduct amount
-          if (acc.id === recurring.accountId) {
-            const occurrences = generateOccurrences(recurring, endDate);
-                    occurrences.forEach(occ => {
+        const occurrences = generateOccurrences(recurring, endDate);
+        occurrences.forEach(occ => {
           addAccountEvent(recurring.accountId, occ.date, -recurring.amount);
           if (recurring.toAccountId) addAccountEvent(recurring.toAccountId, occ.date, recurring.amount);
         });
 
-
+        // For each selected account, generate the correct side of the transfer
+        selectedAccounts.forEach(acc => {
+          // Source account - deduct amount
+          if (acc.id === recurring.accountId) {
             occurrences.forEach(occ => {
               allOccurrences.push({
                 date: occ.date,
@@ -175,7 +173,6 @@ export const CashFlowForecast = () => {
           }
           // Destination account - add amount
           if (acc.id === recurring.toAccountId) {
-            const occurrences = generateOccurrences(recurring, endDate);
             occurrences.forEach(occ => {
               allOccurrences.push({
                 date: occ.date,
@@ -197,6 +194,28 @@ export const CashFlowForecast = () => {
         });
       }
     });
+
+    // Estimated interest - only for accounts in the group whose payout account is also in the group.
+    // Uses real days-in-period and the account's simulated balance so it fluctuates by month
+    // length and grows as deposits/compounding increase the balance.
+    selectedAccounts
+      .filter(acc => acc.interestRate && acc.interestFrequency)
+      .forEach(account => {
+        const payoutAccountId = account.interestPayoutAccountId || account.id;
+        const payoutInGroup = selectedAccounts.some(a => a.id === payoutAccountId);
+        if (!payoutInGroup) return;
+
+        const accountEvents = accountEventsMap.get(account.id) || [];
+        const occurrences = generateInterestOccurrences(account, accountEvents, today, endDate);
+        occurrences.forEach(occ => {
+          allOccurrences.push({
+            date: occ.date,
+            amount: occ.amount,
+            type: 'interest',
+            description: `${account.name} – Estimated Interest`
+          });
+        });
+      });
 
     allOccurrences.sort((a, b) => a.date.getTime() - b.date.getTime());
 
@@ -259,7 +278,7 @@ export const CashFlowForecast = () => {
       <CardHeader>
         <CardTitle>Cash Flow Forecast</CardTitle>
         <CardDescription>
-          Projected balance based on recurring transactions
+          Projected balance based on recurring transactions and estimated savings interest
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
