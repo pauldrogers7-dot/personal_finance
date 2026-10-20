@@ -57,28 +57,62 @@ export const CashFlowForecast = () => {
 
   const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-  // Simulates the account's own balance over time (applying any deposits/withdrawals
+   // Simulates the account's own balance over time (applying any deposits/withdrawals
   // from accountEvents) and accrues interest using the real number of days in each
   // period, so the estimate fluctuates with month length and grows as the balance grows.
+  // If the account has a specific interestNextPaymentDate set, that's used as the anchor
+  // for the first (and, for repeating frequencies, subsequent) occurrence(s) - this matters
+  // most for 'annually'/'other' interest where "today + interval" would rarely land inside
+  // a short forecast window.
   const generateInterestOccurrences = (
-    account: { id: string; balance: number; interestRate?: number; interestFrequency?: string; interestPayoutAccountId?: string },
+    account: { id: string; balance: number; interestRate?: number; interestFrequency?: string; interestPayoutAccountId?: string; interestNextPaymentDate?: Date | string },
     accountEvents: { date: Date; amount: number }[],
     startDate: Date,
     endDate: Date
   ) => {
     const occurrences: { date: Date; amount: number }[] = [];
-    const intervalMonths = getInterestIntervalMonths(account.interestFrequency);
-    if (!account.interestRate || !intervalMonths) return occurrences;
+    if (!account.interestRate) return occurrences;
 
+    const intervalMonths = getInterestIntervalMonths(account.interestFrequency);
     const events = [...accountEvents].sort((a, b) => a.date.getTime() - b.date.getTime());
     let eventIndex = 0;
     let runningBalance = account.balance;
-    let periodStart = new Date(startDate);
     const annualRate = account.interestRate / 100;
+    const dailyRate = annualRate / 365;
     const payoutIsSameAccount = (account.interestPayoutAccountId || account.id) === account.id;
+    const anchorDate = account.interestNextPaymentDate ? new Date(account.interestNextPaymentDate) : null;
 
-    let nextInterestDate = new Date(startDate);
-    nextInterestDate.setMonth(nextInterestDate.getMonth() + intervalMonths);
+    // 'other' (or any frequency without a known repeat interval): we can only show a single,
+    // one-off estimate, and only if the user has told us when it's due.
+    if (!intervalMonths) {
+      if (!anchorDate || anchorDate < startDate || anchorDate > endDate) return occurrences;
+      while (eventIndex < events.length && events[eventIndex].date <= anchorDate) {
+        runningBalance += events[eventIndex].amount;
+        eventIndex++;
+      }
+      const daysInPeriod = Math.max(1, Math.round((anchorDate.getTime() - startDate.getTime()) / MS_PER_DAY));
+      const amount = runningBalance * dailyRate * daysInPeriod;
+      if (amount) occurrences.push({ date: anchorDate, amount });
+      return occurrences;
+    }
+
+    let periodStart: Date;
+    let nextInterestDate: Date;
+
+    if (anchorDate) {
+      // Roll the anchor date forward (by whole intervals) until it's not in the past,
+      // so a date entered a while ago still produces the correct upcoming occurrences.
+      nextInterestDate = new Date(anchorDate);
+      while (nextInterestDate < startDate) {
+        nextInterestDate.setMonth(nextInterestDate.getMonth() + intervalMonths);
+      }
+      periodStart = new Date(nextInterestDate);
+      periodStart.setMonth(periodStart.getMonth() - intervalMonths);
+    } else {
+      periodStart = new Date(startDate);
+      nextInterestDate = new Date(startDate);
+      nextInterestDate.setMonth(nextInterestDate.getMonth() + intervalMonths);
+    }
 
     while (nextInterestDate <= endDate) {
       // Apply any deposits/withdrawals that happen before this interest date
@@ -88,7 +122,6 @@ export const CashFlowForecast = () => {
       }
 
       const daysInPeriod = Math.round((nextInterestDate.getTime() - periodStart.getTime()) / MS_PER_DAY);
-      const dailyRate = annualRate / 365;
       const amount = runningBalance * dailyRate * daysInPeriod;
 
       if (amount) {
@@ -104,7 +137,6 @@ export const CashFlowForecast = () => {
 
     return occurrences;
   };
-
   const generateOccurrences = (recurring: RecurringTransaction, endDate: Date) => {
     const occurrences: { date: Date; amount: number; type: string }[] = [];
     let currentDate = new Date(recurring.nextDate);
@@ -264,7 +296,9 @@ export const CashFlowForecast = () => {
       .filter(o => o.amount < 0 && o.type !== 'transfer_in' && o.type !== 'transfer_out')
       .reduce((sum, o) => sum + o.amount, 0));
 
-    return { dataPoints, startingBalance, totalIncome, totalExpenses };
+     const hasInterestAccounts = selectedAccounts.some(acc => acc.interestRate && acc.interestFrequency);
+
+    return { dataPoints, startingBalance, totalIncome, totalExpenses, hasInterestAccounts };
   }, [accounts, recurringTransactions, selectedAccountIds, forecastMonths]);
 
   // Save selection to localStorage whenever it changes
@@ -362,15 +396,17 @@ export const CashFlowForecast = () => {
           </div>
         </div>
 
-        {forecastData.dataPoints.length === 0 ? (
+             {forecastData.dataPoints.length === 1 ? (
           <div className="text-center py-8 text-muted-foreground">
-            <p>No active recurring transactions to forecast.</p>
-            <p className="text-sm mt-2">Add recurring transactions to see your cash flow projection.</p>
-          </div>
-        ) : forecastData.dataPoints.length === 1 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <p>No recurring transactions scheduled in the forecast period.</p>
-            <p className="text-sm mt-2">Try extending the forecast period or add more recurring transactions.</p>
+            <p>Nothing scheduled in this forecast period.</p>
+            {forecastData.hasInterestAccounts ? (
+              <p className="text-sm mt-2">
+                This account earns interest, but its next payment date falls outside the current forecast period.
+                Try a longer <strong>Forecast Period</strong>, or set a specific <strong>Next Interest Payment Date</strong> on the account so it lands within view.
+              </p>
+            ) : (
+              <p className="text-sm mt-2">Try extending the forecast period or add recurring transactions to see a projection.</p>
+            )}
           </div>
         ) : (
           <>
