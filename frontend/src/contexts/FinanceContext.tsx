@@ -1042,9 +1042,59 @@ export const FinanceProvider: React.FC<FinanceProviderProps> = ({ children }) =>
     );
   };
 
-  const deleteInvestmentTransaction = (id: string) => {
-    setInvestmentTransactions(prev => prev.filter(txn => txn.id !== id));
+    const deleteInvestmentTransaction = (id: string) => {
+    const transaction = investmentTransactions.find(txn => txn.id === id);
+    if (!transaction) return;
+
+    // Reverse the account balance change that was applied when this transaction was added
+    const account = accounts.find(a => a.id === transaction.accountId);
+    if (account) {
+      let balanceChange = 0;
+      if (transaction.type === 'buy') {
+        balanceChange = transaction.totalAmount + (transaction.fees || 0); // money comes back
+      } else if (transaction.type === 'sell') {
+        balanceChange = -(transaction.totalAmount - (transaction.fees || 0));
+      } else if (transaction.type === 'dividend') {
+        balanceChange = -transaction.totalAmount;
+      }
+      if (balanceChange !== 0) {
+        updateAccount(transaction.accountId, { balance: account.balance + balanceChange });
+      }
+    }
+
+    const remaining = investmentTransactions.filter(txn => txn.id !== id);
+    setInvestmentTransactions(remaining);
+
+    // Recompute the holding's quantity & average cost by replaying the remaining transactions
+    // in date order - average cost blending can't be cleanly reversed in isolation.
+    const holding = investmentHoldings.find(h => h.id === transaction.holdingId);
+    if (holding) {
+      const holdingTxns = remaining
+        .filter(txn => txn.holdingId === transaction.holdingId)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      let quantity = 0;
+      let averageCost = 0;
+      holdingTxns.forEach(txn => {
+        if (txn.type === 'buy' || txn.type === 'dividend_reinvest') {
+          const totalCost = (quantity * averageCost) + txn.totalAmount;
+          quantity += txn.quantity;
+          averageCost = quantity > 0 ? totalCost / quantity : 0;
+        } else if (txn.type === 'sell') {
+          quantity -= txn.quantity;
+        }
+      });
+
+      setInvestmentHoldings(prev =>
+        prev.map(h =>
+          h.id === transaction.holdingId
+            ? { ...h, quantity, averageCostPerUnit: averageCost, updatedAt: new Date() }
+            : h
+        )
+      );
+    }
   };
+
 
   const updateHoldingPrice = (holdingId: string, newPrice: number) => {
     updateInvestmentHolding(holdingId, {
