@@ -39,6 +39,7 @@ export const Accounts = () => {
         interestRate: '',
     interestFrequency: 'monthly',
     interestPayoutAccountId: '',
+    interestNextPaymentDate: '',
     // Property fields
     propertyAddress: '',
     purchasePrice: '',
@@ -72,9 +73,10 @@ export const Accounts = () => {
       warningThresholdHigh: '',
       includeInTotalBalance: true,
       includeInTypeTotal: true,
-      interestRate: '',
+            interestRate: '',
       interestFrequency: 'monthly',
       interestPayoutAccountId: '',
+      interestNextPaymentDate: '',
       propertyAddress: '',
       purchasePrice: '',
       purchaseDate: '',
@@ -109,6 +111,7 @@ export const Accounts = () => {
         interestRate: formData.interestRate ? parseFloat(formData.interestRate) : undefined,
         interestFrequency: formData.interestRate ? formData.interestFrequency : undefined,
         interestPayoutAccountId: formData.interestRate ? (formData.interestPayoutAccountId || undefined) : undefined,
+        interestNextPaymentDate: formData.interestRate && formData.interestNextPaymentDate ? new Date(formData.interestNextPaymentDate) : undefined,
       }),
       ...(formData.type === 'property' && {
         propertyAddress: formData.propertyAddress,
@@ -146,9 +149,12 @@ export const Accounts = () => {
         warningThresholdHigh: (account.warningThresholdHigh ?? account.highBalanceWarning)?.toString() || '',
         includeInTotalBalance: account.includeInTotalBalance !== false,
         includeInTypeTotal: account.includeInTypeTotal !== false,
-                interestRate: (account as any).interestRate?.toString() || '',
+               interestRate: (account as any).interestRate?.toString() || '',
         interestFrequency: (account as any).interestFrequency || 'monthly',
         interestPayoutAccountId: (account as any).interestPayoutAccountId || '',
+        interestNextPaymentDate: (account as any).interestNextPaymentDate
+          ? new Date((account as any).interestNextPaymentDate).toISOString().split('T')[0]
+          : '',
         propertyAddress: (account as any).propertyAddress || '',
         purchasePrice: (account as any).purchasePrice?.toString() || '',
         purchaseDate: (account as any).purchaseDate || '',
@@ -362,7 +368,20 @@ export const Accounts = () => {
                           <SelectItem value="other">Other</SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
+                                     </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Next Interest Payment Date (Optional)</Label>
+                    <Input
+                      type="date"
+                      value={formData.interestNextPaymentDate}
+                      onChange={(e) => setFormData({ ...formData, interestNextPaymentDate: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {formData.interestFrequency === 'annually' || formData.interestFrequency === 'other'
+                        ? 'Recommended for annual/other interest so the forecast knows exactly when it lands'
+                        : 'Leave blank to estimate from today based on the frequency above'}
+                    </p>
                   </div>
                   <div className="grid gap-2">
                     <Label>Interest Paid Into</Label>
