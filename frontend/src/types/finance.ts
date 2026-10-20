@@ -73,6 +73,7 @@ export interface Account {
   interestRate?: number; // Annual interest rate (%), typically for savings accounts
   interestFrequency?: 'monthly' | 'quarterly' | 'annually' | 'other'; // How often interest is paid
   interestPayoutAccountId?: string; // Account interest is paid into (defaults to this account if unset)
+  interestNextPaymentDate?: Date; // Next scheduled interest payment date (especially useful for 'annually'/'other')
 
 }
 
